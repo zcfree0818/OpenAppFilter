@@ -1,0 +1,73 @@
+name: 编译 OpenAppFilter 为 ImmortalWrt 23.05.2 IPK
+
+on:
+  workflow_dispatch:
+    inputs:
+      sdk_url:
+        description: 'ImmortalWrt SDK 下载地址 (默认为 23.05.2 x86_64)'
+        required: true
+        default: 'https://downloads.immortalwrt.org/releases/23.05.2/targets/x86/64/immortalwrt-sdk-23.05.2-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.zst'
+
+jobs:
+  build:
+    name: 编译 OAF IPK 安装包
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 安装基础编译依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libncurses5-dev libncursesw5-dev \
+            zlib1g-dev gawk git gettext libssl-dev xsltproc rsync wget unzip python3 \
+            tar zstd file
+
+      - name: 下载并解压 ImmortalWrt 官方 SDK
+        run: |
+          echo "下载 SDK: ${{ github.event.inputs.sdk_url }}"
+          wget -q -O sdk.tar.zst "${{ github.event.inputs.sdk_url }}"
+          mkdir -p sdk
+          tar -I zstd -xf sdk.tar.zst -C sdk --strip-components=1
+          rm -f sdk.tar.zst
+
+      - name: 配置编译工程并载入 OAF 插件
+        run: |
+          cd sdk
+          # 1. 更新并安装 SDK 基础依赖 Feeds
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+          # 2. 将当前仓库中的 OpenAppFilter 源码引入 package 目录
+          mkdir -p package/OpenAppFilter
+          
+          # 自动兼容根目录结构或嵌套目录结构
+          if [ -d "../OpenAppFilter-master/luci-app-oaf" ]; then
+            cp -r ../OpenAppFilter-master/* package/OpenAppFilter/
+          else
+            rsync -av --exclude='sdk' --exclude='.git' --exclude='.github' ../ package/OpenAppFilter/
+          fi
+
+          # 3. 生成默认编译配置
+          make defconfig
+
+      - name: 编译 OpenAppFilter 相关包
+        run: |
+          cd sdk
+          echo "开始并发编译 kmod-oaf、appfilter、luci-app-oaf..."
+          make package/OpenAppFilter/compile V=s -j$(nproc)
+
+      - name: 收集与整理生成的 IPK 文件
+        run: |
+          mkdir -p output_ipks
+          find sdk/bin/ -name "*oaf*.ipk" -exec cp {} output_ipks/ \;
+          find sdk/bin/ -name "*appfilter*.ipk" -exec cp {} output_ipks/ \;
+          echo "==== 成功编译出的 IPK 安装包列表 ===="
+          ls -la output_ipks/
+
+      - name: 上传编译产物到 GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenAppFilter-ImmortalWrt-23.05.2-x86_64-IPKs
+          path: output_ipks/*
