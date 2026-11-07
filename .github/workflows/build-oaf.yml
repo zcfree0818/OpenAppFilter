@@ -39,7 +39,16 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-          # 2. 将 OAF 各模块直接复制到 package 目录
+          # 2. 彻底清理 feeds 中自带的旧版本 OAF (防止旧版本覆写当前 7.0 源码)
+          ./scripts/feeds uninstall appfilter luci-app-oaf kmod-oaf 2>/dev/null || true
+          rm -rf feeds/packages/net/appfilter 2>/dev/null || true
+          rm -rf feeds/packages/net/open-app-filter 2>/dev/null || true
+          rm -rf feeds/luci/applications/luci-app-oaf 2>/dev/null || true
+          rm -rf package/feeds/packages/appfilter 2>/dev/null || true
+          rm -rf package/feeds/luci/luci-app-oaf 2>/dev/null || true
+
+          # 3. 将当前仓库真实的 OAF 7.0 各模块直接复制到 package 目录
+          rm -rf package/luci-app-oaf package/oaf package/open-app-filter
           if [ -d "../OpenAppFilter-master/luci-app-oaf" ]; then
             cp -r ../OpenAppFilter-master/luci-app-oaf package/
             cp -r ../OpenAppFilter-master/oaf package/
@@ -50,22 +59,22 @@ jobs:
             cp -r ../open-app-filter package/
           fi
 
-          # 3. 显式开启 OAF 相关模块编译
+          # 4. 显式开启 OAF 7.0 相关模块编译
           echo "CONFIG_PACKAGE_kmod-oaf=m" >> .config
           echo "CONFIG_PACKAGE_appfilter=m" >> .config
           echo "CONFIG_PACKAGE_luci-app-oaf=m" >> .config
           make defconfig
 
-      - name: 编译 OpenAppFilter 相关包
+      - name: 编译 OpenAppFilter 7.0 相关包
         run: |
           cd sdk
-          echo "==== 开始编译内核模块 kmod-oaf ===="
+          echo "==== 开始编译内核驱动模块 kmod-oaf ===="
           make package/oaf/compile V=s -j$(nproc)
 
-          echo "==== 开始编译用户态守护进程 appfilter ===="
+          echo "==== 开始编译原生 7.0 用户态守护进程 appfilter ===="
           make package/open-app-filter/compile V=s -j$(nproc)
 
-          echo "==== 开始编译前端管理界面 luci-app-oaf ===="
+          echo "==== 开始编译 7.0 前端管理界面 luci-app-oaf ===="
           make package/luci-app-oaf/compile V=s -j$(nproc)
 
       - name: 收集与整理生成的 IPK 文件
@@ -79,5 +88,5 @@ jobs:
       - name: 上传编译产物到 GitHub Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: OpenAppFilter-ImmortalWrt-23.05.2-x86_64-IPKs
+          name: OpenAppFilter-v7.0-ImmortalWrt-23.05.2-IPKs
           path: output_ipks/*
