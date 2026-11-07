@@ -39,24 +39,34 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-          # 2. 将当前仓库中的 OpenAppFilter 源码引入 package 目录
-          mkdir -p package/OpenAppFilter
-          
-          # 自动兼容根目录结构或嵌套目录结构
+          # 2. 将 OAF 各模块直接复制到 package 目录
           if [ -d "../OpenAppFilter-master/luci-app-oaf" ]; then
-            cp -r ../OpenAppFilter-master/* package/OpenAppFilter/
+            cp -r ../OpenAppFilter-master/luci-app-oaf package/
+            cp -r ../OpenAppFilter-master/oaf package/
+            cp -r ../OpenAppFilter-master/open-app-filter package/
           else
-            rsync -av --exclude='sdk' --exclude='.git' --exclude='.github' ../ package/OpenAppFilter/
+            cp -r ../luci-app-oaf package/
+            cp -r ../oaf package/
+            cp -r ../open-app-filter package/
           fi
 
-          # 3. 生成默认编译配置
+          # 3. 显式开启 OAF 相关模块编译
+          echo "CONFIG_PACKAGE_kmod-oaf=m" >> .config
+          echo "CONFIG_PACKAGE_appfilter=m" >> .config
+          echo "CONFIG_PACKAGE_luci-app-oaf=m" >> .config
           make defconfig
 
       - name: 编译 OpenAppFilter 相关包
         run: |
           cd sdk
-          echo "开始并发编译 kmod-oaf、appfilter、luci-app-oaf..."
-          make package/OpenAppFilter/compile V=s -j$(nproc)
+          echo "==== 开始编译内核模块 kmod-oaf ===="
+          make package/oaf/compile V=s -j$(nproc)
+
+          echo "==== 开始编译用户态守护进程 appfilter ===="
+          make package/open-app-filter/compile V=s -j$(nproc)
+
+          echo "==== 开始编译前端管理界面 luci-app-oaf ===="
+          make package/luci-app-oaf/compile V=s -j$(nproc)
 
       - name: 收集与整理生成的 IPK 文件
         run: |
