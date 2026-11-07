@@ -1,0 +1,8 @@
+*.ipk
+*.zip
+*.tar.gz
+*.tar.xz
+*.tar.zst
+/OpenAppFilter-ImmortalWrt*
+/OpenAppFilter-master/
+/tmp_*
