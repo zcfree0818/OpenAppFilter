@@ -6,7 +6,7 @@ on:
       sdk_url:
         description: 'ImmortalWrt SDK 下载地址 (默认为 23.05.2 x86_64)'
         required: true
-        default: 'https://downloads.immortalwrt.org/releases/23.05.2/targets/x86/64/immortalwrt-sdk-23.05.2-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.zst'
+        default: 'https://downloads.immortalwrt.org/releases/23.05.2/targets/x86/64/immortalwrt-sdk-23.05.2-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.xz'
 
 jobs:
   build:
@@ -22,15 +22,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential libncurses5-dev libncursesw5-dev \
             zlib1g-dev gawk git gettext libssl-dev xsltproc rsync wget unzip python3 \
-            tar zstd file
+            tar xz-utils file
 
       - name: 下载并解压 ImmortalWrt 官方 SDK
         run: |
           echo "下载 SDK: ${{ github.event.inputs.sdk_url }}"
-          wget -q -O sdk.tar.zst "${{ github.event.inputs.sdk_url }}"
+          wget -c -t 3 --timeout=60 -O sdk.tar.xz "${{ github.event.inputs.sdk_url }}"
           mkdir -p sdk
-          tar -I zstd -xf sdk.tar.zst -C sdk --strip-components=1
-          rm -f sdk.tar.zst
+          tar -xf sdk.tar.xz -C sdk --strip-components=1
+          rm -f sdk.tar.xz
 
       - name: 配置编译工程并载入 OAF 插件
         run: |
