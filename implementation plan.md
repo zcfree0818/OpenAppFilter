@@ -1,24 +1,24 @@
-# ImmortalWrt 23.05.2 编译与部署 OpenAppFilter 实施计划
+# OpenAppFilter 针对 sing-box 场景定制与中英文特征库合并实施方案
 
-## 1. 目标与环境参数
-- **目标设备系统**：ImmortalWrt 23.05.2 (版本号: `r27625-416c8c5c91`)
-- **硬件架构**：软路由（默认为 `x86/64`，若为 ARM64 替换对应 Target 即可）
-- **内核驱动关键要求**：`kmod-oaf` 必须与固件内核符号及 vermagic 精准匹配。
+## 一、 中英文特征库合并实现计划
 
-## 2. 实施方案
-### 方案 A：GitHub Actions 云端一键编译（零门槛、最推荐）
-- 创建针对 ImmortalWrt 23.05.2 x86/64 的官方 SDK Actions 工作流。
-- 自动拉取 SDK、注入 OpenAppFilter 代码、编译并自动打包下载 3 个核心 ipk：
-  1. `kmod-oaf_*.ipk`
-  2. `appfilter_*.ipk`
-  3. `luci-app-oaf_*.ipk`
+### 1. 数据来源分析
+- **英文基础库**：当前项目中的 `open-app-filter/files/feature.bin` 解密后为纯正的海外热门应用（YouTube, Netflix, Facebook, X, Roblox, WhatsApp 等）。
+- **中文基础库**：包含国内热门应用（微信、抖音、快手、王者荣耀、原神、B站等，在旧版 `feature_cn.cfg` 或在线 Lite 中文版中）。
+- **合并规则**：
+  1. 解析两套特征库中的 `#class` 类别（Chat, Game, Video, Shopping 等）。
+  2. 合并各分类下的应用规则，保持各应用 AppID 不冲突（例如中文应用使用 `1001~`，英文应用使用 `1101~`）。
+  3. 保留应用图标索引与七层协议正则/特征码。
+  4. 使用相同的 XTEA-CTR 加密密钥（`0x8f4c29a1, 0x73b6d502, 0xc14e87f3, 0x2ad95b60`）和标准头部格式生成统一的 `/etc/fwxd/feature.bin`。
 
-### 方案 B：本地 Linux / WSL 终端编译
-- 搭建 Ubuntu/Debian 编译环境及依赖包。
-- 下载 ImmortalWrt 23.05.2 对应官方 SDK。
-- 配置 feeds 与 package，执行独立包编译。
+### 2. 成果产出
+- 生成中英文双语全量 `feature.bin`，直接替换软路由上的文件，执行 `/etc/init.d/appfilter restart` 即可同时生效。
 
-### 软路由安装与配置
-- 将编译生成的 ipk 文件通过 SCP 上传到路由器 `/tmp`。
-- 安装 `luci-compat` 等必要依赖。
-- 检查后台服务与网络加速冲突设置。
+---
+
+## 二、 sing-box + yacd 架构改造与融合评估
+
+### 1. 业务流程对比
+- **流量路径**：局域网客户端流量 -> Netfilter PREROUTING（OAF 先行捕获并识别真实客户端 MAC/应用）-> sing-box 透明代理转发（根据分流规则直连或走代理节点）。
+- **交互整合方式**：
+  - 调研 yacd 控制面板的扩展能力，探讨是在 yacd 中增加 OAF 控制卡片，还是提供轻量级联动方案。
